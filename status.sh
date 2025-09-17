@@ -129,36 +129,6 @@ get_cron_info() {
     fi
 }
 
-# Test backup integrity (check if we can decrypt latest backup)
-test_backup_integrity() {
-    if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
-        echo -e "${RED}NO .env FILE${NC}"
-        return
-    fi
-    
-    source "$SCRIPT_DIR/.env"
-    
-    if [[ -z "${BACKUP_PASSWORD:-}" ]]; then
-        echo -e "${RED}NO PASSWORD${NC}"
-        return
-    fi
-    
-    local latest_backup=$(find "$BACKUPS_DIR" -name "*.zip.enc" -type f -exec stat -f "%m %N" {} \; 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2- || echo "")
-    
-    if [[ -z "$latest_backup" ]]; then
-        echo -e "${YELLOW}NO BACKUPS${NC}"
-        return
-    fi
-    
-    # Simple decryption test - just check if we can start decrypting
-    if openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$latest_backup" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null | head -c 1 >/dev/null 2>&1; then
-        echo -e "${GREEN}DECRYPTABLE${NC}"
-    elif openssl enc -aes-256-cbc -d -salt -in "$latest_backup" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null | head -c 1 >/dev/null 2>&1; then
-        echo -e "${GREEN}DECRYPTABLE${NC}"
-    else
-        echo -e "${RED}CANNOT DECRYPT${NC}"
-    fi
-}
 
 # Main status display
 main() {
@@ -170,7 +140,6 @@ main() {
     IFS='|' read -r disk_avail disk_total disk_used disk_percent <<< "$(get_disk_info)"
     IFS='|' read -r last_success last_error <<< "$(get_last_backup_result)"
     IFS='|' read -r cron_status cron_schedule <<< "$(get_cron_info)"
-    local integrity_status=$(test_backup_integrity)
     
     # Display status table
     printf "%-30s | %s\n" "Property" "Value"
@@ -182,7 +151,6 @@ main() {
     if [[ "$count" -gt 0 ]]; then
         printf "%-30s | %s (%s)\n" "Oldest Backup" "$oldest_file" "$(format_time_ago $oldest_time)"
         printf "%-30s | %s (%s)\n" "Newest Backup" "$newest_file" "$(format_time_ago $newest_time)"
-        printf "%-30s | %s\n" "Latest Backup Status" "$integrity_status"
     fi
     
     printf "%-30s | %s\n" "Disk Space Available" "$disk_avail"
