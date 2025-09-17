@@ -162,7 +162,7 @@ create_backup() {
     
     # Encrypt the backup file
     log_info "Encrypting backup file..."
-    if ! openssl enc -aes-256-cbc -salt -in "$backup_file" -out "$encrypted_file" -pass pass:"$BACKUP_PASSWORD"; then
+    if ! openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$encrypted_file" -pass pass:"$BACKUP_PASSWORD"; then
         log_error "Failed to encrypt backup file"
         exit 1
     fi
@@ -185,10 +185,23 @@ create_backup() {
     
     # Verify we can decrypt the file (integrity check)
     log_info "Verifying backup integrity..."
-    if ! openssl enc -aes-256-cbc -d -salt -in "$encrypted_file" -pass pass:"$BACKUP_PASSWORD" | head -c 1 > /dev/null; then
+    local temp_verify=$(mktemp)
+    trap "rm -f '$temp_verify'" EXIT
+    
+    if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$encrypted_file" -out "$temp_verify" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
         log_error "Backup integrity check failed - cannot decrypt file"
+        rm -f "$temp_verify"
         exit 1
     fi
+    
+    # Verify it's a valid zip file
+    if ! unzip -t "$temp_verify" >/dev/null 2>&1; then
+        log_error "Backup integrity check failed - decrypted file is not a valid zip"
+        rm -f "$temp_verify"
+        exit 1
+    fi
+    
+    rm -f "$temp_verify"
     log_success "Backup integrity verified"
     
     return 0

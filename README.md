@@ -199,7 +199,7 @@ If you prefer to manually decrypt and restore a backup:
 
 ```bash
 # Decrypt the backup
-openssl enc -aes-256-cbc -d -salt -in ./backups/20240917143022.zip.enc -out restored-backup.zip -pass pass:your-password
+openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in ./backups/20240917143022.zip.enc -out restored-backup.zip -pass pass:your-password
 
 # Extract the backup
 unzip restored-backup.zip

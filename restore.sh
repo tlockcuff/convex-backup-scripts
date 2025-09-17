@@ -160,17 +160,24 @@ verify_backup() {
         exit 1
     fi
     
-    # Test decryption
-    if ! openssl enc -aes-256-cbc -d -salt -in "$backup_file" -pass pass:"$BACKUP_PASSWORD" | head -c 1 > /dev/null 2>&1; then
+    # Test decryption by decrypting to a temporary file
+    local temp_test=$(mktemp)
+    trap "rm -f '$temp_test'" EXIT
+    
+    if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
         log_error "Failed to decrypt backup file. Check your password."
+        rm -f "$temp_test"
         exit 1
     fi
     
     # Test if it's a valid zip file
-    if ! openssl enc -aes-256-cbc -d -salt -in "$backup_file" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null | unzip -t 2>/dev/null | grep -q "OK"; then
+    if ! unzip -t "$temp_test" >/dev/null 2>&1; then
         log_error "Backup file appears to be corrupted (not a valid zip file)"
+        rm -f "$temp_test"
         exit 1
     fi
+    
+    rm -f "$temp_test"
     
     log_success "Backup integrity verified successfully"
 }
@@ -201,7 +208,7 @@ restore_backup() {
     
     # Decrypt the backup
     log_info "Decrypting backup file..."
-    if ! openssl enc -aes-256-cbc -d -salt -in "$backup_file" -out "$temp_backup" -pass pass:"$BACKUP_PASSWORD"; then
+    if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$temp_backup" -pass pass:"$BACKUP_PASSWORD"; then
         log_error "Failed to decrypt backup file"
         exit 1
     fi
