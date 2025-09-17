@@ -1,19 +1,16 @@
 #!/bin/bash
 
+# config variables
+timestamp=$(date +%Y%m%d%H%M%S)
+backup_script="$PWD/backup.sh"
+cron_expression="0 12 * * *" # every day at 12:00 AM
+retention_policy=14 # 14 days
+
 # Load environment variables
 source .env
 
-# Check if backup password is set
-if [ -z "$BACKUP_PASSWORD" ]; then
-    echo "Error: BACKUP_PASSWORD not set in .env file"
-    exit 1
-fi
-
 # create the backups directory if it doesn't exist
 mkdir -p backups
-
-# define a timestamp for the backup file
-timestamp=$(date +%Y%m%d%H%M%S)
 
 # export the convex database
 npx --yes convex export --include-file-storage --path ./backups/$timestamp.zip
@@ -26,3 +23,11 @@ rm ./backups/$timestamp.zip
 
 # print a success message
 echo "Backup created and encrypted successfully"
+
+# apply a retention policy to the backups directory every time this script runs
+find ./backups -type f -mtime +$retention_policy -exec rm {} \; 
+
+# conditionally update crontab to run the backup script
+if ! crontab -l | grep -q "$cron_expression $backup_script"; then
+    (crontab -l 2>/dev/null; echo "$cron_expression $backup_script") | crontab -
+fi
