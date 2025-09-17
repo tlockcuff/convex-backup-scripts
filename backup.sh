@@ -211,11 +211,21 @@ apply_retention_policy() {
 setup_cron() {
     log_info "Checking cron job setup..."
     
-    if crontab -l 2>/dev/null | grep -q "$CRON_EXPRESSION $BACKUP_SCRIPT"; then
+    # Check if any cron job exists for this backup script (regardless of log redirection)
+    if crontab -l 2>/dev/null | grep -F "$BACKUP_SCRIPT" | grep -q "$CRON_EXPRESSION"; then
         log_info "Cron job already exists"
     else
-        log_info "Adding cron job..."
-        (crontab -l 2>/dev/null; echo "$CRON_EXPRESSION $BACKUP_SCRIPT >> $LOG_FILE 2>&1") | crontab -
+        # Remove any existing entries for this script to avoid duplicates
+        local temp_cron=$(mktemp)
+        crontab -l 2>/dev/null | grep -v -F "$BACKUP_SCRIPT" > "$temp_cron" || true
+        
+        # Add the new cron job
+        echo "$CRON_EXPRESSION $BACKUP_SCRIPT >> $LOG_FILE 2>&1" >> "$temp_cron"
+        
+        # Install the new crontab
+        crontab "$temp_cron"
+        rm -f "$temp_cron"
+        
         log_success "Cron job added: $CRON_EXPRESSION"
     fi
 }
