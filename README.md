@@ -249,7 +249,21 @@ unzip restored-backup.zip
    ./restore.sh --verify backup-file.zip.enc
    ```
 
-5. **Cron job not working**
+5. **"unzip: command not found" error**
+   ```bash
+   # Install unzip on Ubuntu/Debian
+   sudo apt-get install unzip
+   
+   # Install unzip on RHEL/CentOS/Fedora
+   sudo yum install unzip
+   # or on newer versions:
+   sudo dnf install unzip
+   
+   # Install unzip on macOS
+   brew install unzip
+   ```
+
+6. **Cron job not working**
    ```bash
    # Check cron job status
    ./status.sh

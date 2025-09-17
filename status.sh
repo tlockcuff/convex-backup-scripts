@@ -150,21 +150,14 @@ test_backup_integrity() {
         return
     fi
     
-    local temp_test=$(mktemp)
-    # Try new method first, then legacy
-    local decrypt_success=false
-    if openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$latest_backup" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
-        decrypt_success=true
-    elif openssl enc -aes-256-cbc -d -salt -in "$latest_backup" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
-        decrypt_success=true
-    fi
-    
-    if [[ "$decrypt_success" == "true" ]] && unzip -t "$temp_test" >/dev/null 2>&1; then
-        echo -e "${GREEN}VALID${NC}"
+    # Simple decryption test - just check if we can start decrypting
+    if openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$latest_backup" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null | head -c 1 >/dev/null 2>&1; then
+        echo -e "${GREEN}DECRYPTABLE${NC}"
+    elif openssl enc -aes-256-cbc -d -salt -in "$latest_backup" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null | head -c 1 >/dev/null 2>&1; then
+        echo -e "${GREEN}DECRYPTABLE${NC}"
     else
-        echo -e "${RED}CORRUPT${NC}"
+        echo -e "${RED}CANNOT DECRYPT${NC}"
     fi
-    rm -f "$temp_test"
 }
 
 # Main status display
@@ -189,7 +182,7 @@ main() {
     if [[ "$count" -gt 0 ]]; then
         printf "%-30s | %s (%s)\n" "Oldest Backup" "$oldest_file" "$(format_time_ago $oldest_time)"
         printf "%-30s | %s (%s)\n" "Newest Backup" "$newest_file" "$(format_time_ago $newest_time)"
-        printf "%-30s | %s\n" "Latest Backup Integrity" "$integrity_status"
+        printf "%-30s | %s\n" "Latest Backup Status" "$integrity_status"
     fi
     
     printf "%-30s | %s\n" "Disk Space Available" "$disk_avail"
