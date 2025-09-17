@@ -85,6 +85,10 @@ write_config() {
     local convex_key="${CONVEX_SELF_HOSTED_ADMIN_KEY:-}"
     local convex_url="${CONVEX_SELF_HOSTED_URL:-}"
     local retention="${RETENTION_POLICY:-14}"
+    local aws_region="${AWS_REGION:-}"
+    local aws_access_key="${AWS_ACCESS_KEY_ID:-}"
+    local aws_secret_key="${AWS_SECRET_ACCESS_KEY:-}"
+    local aws_bucket="${AWS_BUCKET_NAME:-}"
     
     {
         echo "# Convex Backup Configuration"
@@ -96,6 +100,12 @@ write_config() {
         echo "# Convex self-hosted configuration (optional)"
         echo "CONVEX_SELF_HOSTED_ADMIN_KEY=\"$convex_key\""
         echo "CONVEX_SELF_HOSTED_URL=\"$convex_url\""
+        echo ""
+        echo "# AWS S3 configuration (optional - for cloud backup storage)"
+        echo "AWS_REGION=\"$aws_region\""
+        echo "AWS_ACCESS_KEY_ID=\"$aws_access_key\""
+        echo "AWS_SECRET_ACCESS_KEY=\"$aws_secret_key\""
+        echo "AWS_BUCKET_NAME=\"$aws_bucket\""
         echo ""
         echo "# Backup retention policy in days (optional, default: 14)"
         echo "RETENTION_POLICY=$retention"
@@ -144,6 +154,28 @@ check_config() {
     # Check retention policy
     local retention="${RETENTION_POLICY:-14}"
     printf "%-30s | %s\n" "Retention Policy" "${GREEN}$retention days${NC}"
+    
+    # Check AWS S3 configuration
+    if [[ -n "${AWS_BUCKET_NAME:-}" ]]; then
+        printf "%-30s | %s\n" "AWS S3 Bucket" "${GREEN}${AWS_BUCKET_NAME}${NC}"
+        if [[ -n "${AWS_REGION:-}" ]]; then
+            printf "%-30s | %s\n" "AWS Region" "${GREEN}${AWS_REGION}${NC}"
+        else
+            printf "%-30s | %s\n" "AWS Region" "${RED}✗ Not set${NC}"
+        fi
+        if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
+            printf "%-30s | %s\n" "AWS Access Key" "${GREEN}✓ Set${NC}"
+        else
+            printf "%-30s | %s\n" "AWS Access Key" "${RED}✗ Not set${NC}"
+        fi
+        if [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            printf "%-30s | %s\n" "AWS Secret Key" "${GREEN}✓ Set${NC}"
+        else
+            printf "%-30s | %s\n" "AWS Secret Key" "${RED}✗ Not set${NC}"
+        fi
+    else
+        printf "%-30s | %s\n" "AWS S3 Upload" "${YELLOW}○ Disabled${NC}"
+    fi
     
     # Check script permissions
     if [[ -x "$SCRIPT_DIR/backup.sh" ]]; then
@@ -249,19 +281,47 @@ interactive_setup() {
         CONVEX_SELF_HOSTED_URL=${input_url:-${CONVEX_SELF_HOSTED_URL:-}}
     fi
     
+    # AWS S3 configuration
+    echo -e "\n${BLUE}3. AWS S3 Configuration (Optional)${NC}"
+    echo "Configure AWS S3 for cloud backup storage and automatic local cleanup."
+    
+    read -p "Do you want to configure AWS S3 backup? [y/N]: " configure_aws
+    configure_aws=${configure_aws:-n}
+    
+    if [[ "$configure_aws" =~ ^[Yy] ]]; then
+        read -p "AWS S3 Bucket Name [${AWS_BUCKET_NAME:-}]: " input_bucket
+        AWS_BUCKET_NAME=${input_bucket:-${AWS_BUCKET_NAME:-}}
+        
+        read -p "AWS Region [${AWS_REGION:-us-east-1}]: " input_region
+        AWS_REGION=${input_region:-${AWS_REGION:-us-east-1}}
+        
+        read -p "AWS Access Key ID [${AWS_ACCESS_KEY_ID:-}]: " input_access_key
+        AWS_ACCESS_KEY_ID=${input_access_key:-${AWS_ACCESS_KEY_ID:-}}
+        
+        read -sp "AWS Secret Access Key: " input_secret_key
+        echo ""
+        if [[ -n "$input_secret_key" ]]; then
+            AWS_SECRET_ACCESS_KEY="$input_secret_key"
+        fi
+        
+        if [[ -n "$AWS_BUCKET_NAME" ]]; then
+            echo "AWS S3 backup will be enabled. Local backups will be deleted after successful S3 upload."
+        fi
+    fi
+    
     # Retention policy
-    echo -e "\n${BLUE}3. Backup Retention Policy${NC}"
+    echo -e "\n${BLUE}4. Backup Retention Policy${NC}"
     local current_retention="${RETENTION_POLICY:-14}"
     read -p "Backup retention days [$current_retention]: " input_retention
     RETENTION_POLICY=${input_retention:-$current_retention}
     
     # Save configuration
-    echo -e "\n${BLUE}4. Saving Configuration${NC}"
+    echo -e "\n${BLUE}5. Saving Configuration${NC}"
     write_config
     
     # Set script permissions
-    echo -e "\n${BLUE}5. Setting Script Permissions${NC}"
-    chmod +x "$SCRIPT_DIR/backup.sh" "$SCRIPT_DIR/status.sh" "$SCRIPT_DIR/restore.sh" 2>/dev/null || true
+    echo -e "\n${BLUE}6. Setting Script Permissions${NC}"
+    chmod +x "$SCRIPT_DIR/backup.sh" "$SCRIPT_DIR/status.sh" 2>/dev/null || true
     log_success "Script permissions set"
     
     echo -e "\n${GREEN}=== Setup Complete! ===${NC}"
@@ -362,7 +422,7 @@ main() {
         fi
         
         write_config
-        chmod +x "$SCRIPT_DIR/backup.sh" "$SCRIPT_DIR/status.sh" "$SCRIPT_DIR/restore.sh" 2>/dev/null || true
+        chmod +x "$SCRIPT_DIR/backup.sh" "$SCRIPT_DIR/status.sh" 2>/dev/null || true
     else
         # Interactive mode
         interactive_setup

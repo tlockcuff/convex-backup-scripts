@@ -104,6 +104,37 @@ validate_config() {
         fi
     done
     
+    # Check AWS configuration if S3 upload is enabled
+    if [[ -n "${AWS_BUCKET_NAME:-}" ]]; then
+        log_info "AWS S3 upload enabled - validating AWS configuration..."
+        
+        if [[ -z "${AWS_REGION:-}" ]]; then
+            log_error "AWS_REGION is required when AWS_BUCKET_NAME is set"
+            exit 1
+        fi
+        
+        if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+            log_error "AWS_ACCESS_KEY_ID is required when AWS_BUCKET_NAME is set"
+            exit 1
+        fi
+        
+        if [[ -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            log_error "AWS_SECRET_ACCESS_KEY is required when AWS_BUCKET_NAME is set"
+            exit 1
+        fi
+        
+        # Check if AWS CLI is available
+        if ! command -v "aws" &> /dev/null; then
+            log_error "AWS CLI is required for S3 upload but not found"
+            log_error "Please install AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            exit 1
+        fi
+        
+        log_success "AWS S3 configuration validated"
+    else
+        log_info "AWS S3 upload disabled - backups will be stored locally only"
+    fi
+    
     
     # Check available disk space (require at least 1GB free)
     local available_space=$(df "$SCRIPT_DIR" | awk 'NR==2 {print $4}')
@@ -186,6 +217,50 @@ create_backup() {
     
     log_success "Backup created and encrypted"
     
+    # Upload to S3 if configured
+    upload_to_s3 "$encrypted_file"
+    
+    return 0
+}
+
+# Upload backup to S3 and clean up local file
+upload_to_s3() {
+    local encrypted_file="$1"
+    local filename=$(basename "$encrypted_file")
+    
+    if [[ -z "${AWS_BUCKET_NAME:-}" ]]; then
+        log_info "S3 upload disabled - keeping backup locally"
+        return 0
+    fi
+    
+    log_info "Uploading backup to S3..."
+    
+    # Set AWS environment variables for this session
+    export AWS_REGION="${AWS_REGION}"
+    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+    
+    # Create S3 key with date prefix for organization
+    local s3_key="convex-backups/$(date +%Y)/$(date +%m)/$(date +%d)/$filename"
+    
+    # Upload to S3
+    if aws s3 cp "$encrypted_file" "s3://${AWS_BUCKET_NAME}/$s3_key" --storage-class STANDARD_IA; then
+        log_success "Backup uploaded to S3: s3://${AWS_BUCKET_NAME}/$s3_key"
+        
+        # Verify the upload by checking if file exists in S3
+        if aws s3 ls "s3://${AWS_BUCKET_NAME}/$s3_key" >/dev/null 2>&1; then
+            log_info "Upload verified - removing local backup to free space"
+            rm "$encrypted_file"
+            log_success "Local backup file removed: $filename"
+        else
+            log_error "S3 upload verification failed - keeping local backup"
+            return 1
+        fi
+    else
+        log_error "Failed to upload backup to S3 - keeping local backup"
+        return 1
+    fi
+    
     return 0
 }
 
@@ -193,17 +268,71 @@ create_backup() {
 apply_retention_policy() {
     log_info "Applying retention policy (${RETENTION_POLICY} days)..."
     
+    # Clean up local backups
     local deleted_count=0
     while IFS= read -r -d '' file; do
-        log_info "Removing old backup: $(basename "$file")"
+        log_info "Removing old local backup: $(basename "$file")"
         rm "$file"
         ((deleted_count++))
-    done < <(find "$BACKUPS_DIR" -name "*.zip.enc" -type f -mtime "+$RETENTION_POLICY" -print0)
+    done < <(find "$BACKUPS_DIR" -name "*.zip.enc" -type f -mtime "+$RETENTION_POLICY" -print0 2>/dev/null || true)
     
     if [[ $deleted_count -gt 0 ]]; then
-        log_success "Removed $deleted_count old backup(s)"
+        log_success "Removed $deleted_count old local backup(s)"
     else
-        log_info "No old backups to remove"
+        log_info "No old local backups to remove"
+    fi
+    
+    # Clean up S3 backups if S3 is configured
+    if [[ -n "${AWS_BUCKET_NAME:-}" ]]; then
+        log_info "Cleaning up old S3 backups..."
+        cleanup_s3_backups
+    fi
+}
+
+# Clean up old S3 backups
+cleanup_s3_backups() {
+    # Set AWS environment variables
+    export AWS_REGION="${AWS_REGION}"
+    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+    
+    # Calculate cutoff date
+    local cutoff_date
+    if command -v "gdate" &> /dev/null; then
+        # macOS with GNU date installed
+        cutoff_date=$(gdate -d "-${RETENTION_POLICY} days" +%Y-%m-%d)
+    elif date --version >/dev/null 2>&1; then
+        # Linux with GNU date
+        cutoff_date=$(date -d "-${RETENTION_POLICY} days" +%Y-%m-%d)
+    else
+        # macOS with BSD date
+        cutoff_date=$(date -v-${RETENTION_POLICY}d +%Y-%m-%d)
+    fi
+    
+    log_info "Removing S3 backups older than $cutoff_date..."
+    
+    # List and delete old S3 objects
+    local deleted_s3_count=0
+    while IFS= read -r s3_object; do
+        if [[ -n "$s3_object" ]]; then
+            # Extract date from S3 key (format: convex-backups/YYYY/MM/DD/filename)
+            local object_date=$(echo "$s3_object" | grep -o 'convex-backups/[0-9]\{4\}/[0-9]\{2\}/[0-9]\{2\}/' | sed 's|convex-backups/||; s|/|-|g; s|-$||')
+            
+            if [[ "$object_date" < "$cutoff_date" ]]; then
+                log_info "Removing old S3 backup: $s3_object"
+                if aws s3 rm "s3://${AWS_BUCKET_NAME}/$s3_object" >/dev/null 2>&1; then
+                    ((deleted_s3_count++))
+                else
+                    log_warn "Failed to remove S3 object: $s3_object"
+                fi
+            fi
+        fi
+    done < <(aws s3 ls "s3://${AWS_BUCKET_NAME}/convex-backups/" --recursive | grep '\.zip\.enc$' | awk '{print $4}' 2>/dev/null || true)
+    
+    if [[ $deleted_s3_count -gt 0 ]]; then
+        log_success "Removed $deleted_s3_count old S3 backup(s)"
+    else
+        log_info "No old S3 backups to remove"
     fi
 }
 

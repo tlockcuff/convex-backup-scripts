@@ -18,6 +18,7 @@ This tool creates encrypted backups of your Convex database, including file stor
 - 🚫 **Concurrency Protection**: Prevents multiple backup processes
 - 📝 **Detailed Logging**: Structured logging with timestamps and colors
 - 🎯 **Interactive Setup**: Easy configuration with guided setup
+- ☁️ **S3 Cloud Storage**: Optional AWS S3 upload with automatic local cleanup
 
 ## Prerequisites
 
@@ -25,6 +26,7 @@ This tool creates encrypted backups of your Convex database, including file stor
 - Convex CLI access
 - OpenSSL (typically pre-installed on macOS/Linux)
 - A Convex project with appropriate permissions
+- AWS CLI (optional, for S3 cloud storage)
 
 ## Quick Setup
 
@@ -146,9 +148,24 @@ BACKUP_PASSWORD=your-secure-password-here
 CONVEX_SELF_HOSTED_ADMIN_KEY=your-admin-key
 CONVEX_SELF_HOSTED_URL=your-convex-url
 
+# Optional: AWS S3 cloud storage (enables automatic S3 upload and local cleanup)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_BUCKET_NAME=your-backup-bucket
+
 # Optional: Backup retention policy (days)
 RETENTION_POLICY=14
 ```
+
+### S3 Cloud Storage
+
+When AWS S3 is configured, the backup script will:
+1. Upload encrypted backups to S3 with organized folder structure: `convex-backups/YYYY/MM/DD/`
+2. Use `STANDARD_IA` storage class for cost optimization
+3. Verify successful upload before deleting local backup files
+4. Apply retention policy to both local and S3 backups
+5. Keep backups locally if S3 upload fails
 
 ### Example Output
 
