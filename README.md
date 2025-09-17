@@ -14,9 +14,7 @@ This tool creates encrypted backups of your Convex database, including file stor
 - 🔐 **Secure**: Original unencrypted files are automatically deleted
 - ⚙️ **Configurable**: Environment variable-based configuration
 - 📊 **Comprehensive Status**: Real-time backup monitoring and health checks
-- 🔄 **Automated Restore**: Interactive and command-line restore options
 - 🛡️ **Error Handling**: Robust error handling with detailed logging
-- 🔍 **Integrity Verification**: Automatic backup integrity checking
 - 🚫 **Concurrency Protection**: Prevents multiple backup processes
 - 📝 **Detailed Logging**: Structured logging with timestamps and colors
 - 🎯 **Interactive Setup**: Easy configuration with guided setup
@@ -68,7 +66,7 @@ npm install
 
 5. **Make scripts executable**:
    ```bash
-   chmod +x backup.sh status.sh restore.sh setup.sh
+   chmod +x backup.sh status.sh setup.sh
    ```
 
 ### Option 3: Command Line Setup
@@ -100,10 +98,9 @@ The backup script will:
 2. Create a `backups/` directory with secure permissions
 3. Export your Convex database with file storage
 4. Encrypt the backup using AES-256-CBC encryption
-5. Verify backup integrity
-6. Apply retention policy (remove old backups)
-7. Set up cron job for automatic backups
-8. Log all operations to `backup.log`
+5. Apply retention policy (remove old backups)
+6. Set up cron job for automatic backups
+7. Log all operations to `backup.log`
 
 ### Checking Status
 
@@ -120,28 +117,6 @@ The status script shows:
 - Cron job configuration
 - Last backup success/error
 - Health checks and warnings
-
-### Restoring Backups
-
-```bash
-# List available backups
-./restore.sh --list
-
-# Interactive restore
-./restore.sh --interactive
-
-# Restore specific backup
-./restore.sh 20240917143022.zip.enc
-
-# Restore to custom directory
-./restore.sh --output /path/to/restore 20240917143022.zip.enc
-
-# Verify backup integrity only
-./restore.sh --verify 20240917143022.zip.enc
-
-# Test restore without extracting files
-./restore.sh --test 20240917143022.zip.enc
-```
 
 ### Configuration Management
 
@@ -188,14 +163,12 @@ RETENTION_POLICY=14
 [2024-09-17 14:30:45] [SUCCESS] Database exported successfully (15MB)
 [2024-09-17 14:30:45] [INFO] Encrypting backup file...
 [2024-09-17 14:30:46] [SUCCESS] Backup file encrypted successfully
-[2024-09-17 14:30:46] [INFO] Verifying backup integrity...
-[2024-09-17 14:30:46] [SUCCESS] Backup integrity verified
 [2024-09-17 14:30:46] [SUCCESS] 🎉 Backup completed successfully!
 ```
 
-## Manual Restore (Alternative Method)
+## Manual Restore
 
-If you prefer to manually decrypt and restore a backup:
+To manually decrypt and restore a backup:
 
 ```bash
 # Decrypt the backup
@@ -207,8 +180,6 @@ unzip restored-backup.zip
 # Import back to Convex (refer to Convex documentation for import commands)
 ```
 
-**Note**: The `./restore.sh` script provides a safer and more user-friendly way to restore backups.
-
 ## Security Notes
 
 - 🔐 The `.env` file contains your encryption password and is excluded from version control
@@ -216,6 +187,5 @@ unzip restored-backup.zip
 - 🔒 Original unencrypted backup files are automatically deleted
 - 💾 Keep your encryption password safe - you'll need it to restore backups
 - 🛡️ Backup files have restrictive permissions (600) for security
-- 🔍 Automatic integrity verification ensures backup files are not corrupted
 - 🚫 Lock files prevent concurrent backup operations
 - 📝 Detailed logging helps track all backup operations

@@ -2,5 +2,4 @@ backups
 node_modules
 .env
 *.log
-restore
 *.lock
