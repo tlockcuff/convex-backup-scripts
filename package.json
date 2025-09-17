@@ -11,5 +11,8 @@
   "description": "",
   "dependencies": {
     "convex": "^1.27.0"
+  },
+  "volta": {
+    "node": "24.8.0"
   }
 }
