@@ -33,8 +33,8 @@ This tool creates encrypted backups of your Convex database, including file stor
 ### Option 1: Interactive Setup (Recommended)
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd convex-backup
+git clone https://github.com/tlockcuff/convex-backup-scripts.git
+cd convex-backup-scripts
 
 # Install dependencies
 npm install
