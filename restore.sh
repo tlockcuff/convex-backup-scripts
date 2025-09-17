@@ -164,10 +164,15 @@ verify_backup() {
     local temp_test=$(mktemp)
     trap "rm -f '$temp_test'" EXIT
     
+    # Try new method first, then fall back to legacy
     if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
-        log_error "Failed to decrypt backup file. Check your password."
-        rm -f "$temp_test"
-        exit 1
+        log_warn "New decryption method failed, trying legacy method..."
+        if ! openssl enc -aes-256-cbc -d -salt -in "$backup_file" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
+            log_error "Failed to decrypt backup file with either method. Check your password."
+            rm -f "$temp_test"
+            exit 1
+        fi
+        log_info "Successfully decrypted with legacy method"
     fi
     
     # Test if it's a valid zip file
@@ -208,9 +213,14 @@ restore_backup() {
     
     # Decrypt the backup
     log_info "Decrypting backup file..."
-    if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$temp_backup" -pass pass:"$BACKUP_PASSWORD"; then
-        log_error "Failed to decrypt backup file"
-        exit 1
+    # Try new method first, then fall back to legacy
+    if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$temp_backup" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
+        log_warn "New decryption method failed, trying legacy method..."
+        if ! openssl enc -aes-256-cbc -d -salt -in "$backup_file" -out "$temp_backup" -pass pass:"$BACKUP_PASSWORD"; then
+            log_error "Failed to decrypt backup file with either method"
+            exit 1
+        fi
+        log_info "Successfully decrypted with legacy method"
     fi
     
     log_success "Backup decrypted successfully"

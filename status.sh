@@ -151,8 +151,15 @@ test_backup_integrity() {
     fi
     
     local temp_test=$(mktemp)
-    if openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$latest_backup" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null && \
-       unzip -t "$temp_test" >/dev/null 2>&1; then
+    # Try new method first, then legacy
+    local decrypt_success=false
+    if openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$latest_backup" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
+        decrypt_success=true
+    elif openssl enc -aes-256-cbc -d -salt -in "$latest_backup" -out "$temp_test" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
+        decrypt_success=true
+    fi
+    
+    if [[ "$decrypt_success" == "true" ]] && unzip -t "$temp_test" >/dev/null 2>&1; then
         echo -e "${GREEN}VALID${NC}"
     else
         echo -e "${RED}CORRUPT${NC}"

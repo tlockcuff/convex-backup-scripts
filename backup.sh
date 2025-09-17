@@ -186,17 +186,44 @@ create_backup() {
     # Verify we can decrypt the file (integrity check)
     log_info "Verifying backup integrity..."
     local temp_verify=$(mktemp)
-    trap "rm -f '$temp_verify'" EXIT
     
+    # First, try to decrypt the file with new method
     if ! openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -in "$encrypted_file" -out "$temp_verify" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
-        log_error "Backup integrity check failed - cannot decrypt file"
+        log_warn "New decryption method failed, trying legacy method..."
+        # Try legacy method for backward compatibility
+        if ! openssl enc -aes-256-cbc -d -salt -in "$encrypted_file" -out "$temp_verify" -pass pass:"$BACKUP_PASSWORD" 2>/dev/null; then
+            log_error "Backup integrity check failed - cannot decrypt file with either method"
+            rm -f "$temp_verify"
+            exit 1
+        fi
+        log_warn "Successfully decrypted with legacy method"
+    fi
+    
+    # Check if decrypted file has content
+    local decrypted_size=$(stat -f%z "$temp_verify" 2>/dev/null || stat -c%s "$temp_verify" 2>/dev/null || echo 0)
+    if [[ "$decrypted_size" -eq 0 ]]; then
+        log_error "Backup integrity check failed - decrypted file is empty"
         rm -f "$temp_verify"
         exit 1
     fi
     
+    log_info "Decrypted file size: $(($decrypted_size/1024/1024))MB"
+    
+    # Check file type
+    local file_type=$(file -b "$temp_verify" 2>/dev/null || echo "unknown")
+    log_info "Decrypted file type: $file_type"
+    
     # Verify it's a valid zip file
-    if ! unzip -t "$temp_verify" >/dev/null 2>&1; then
+    local zip_test_output=$(unzip -t "$temp_verify" 2>&1)
+    if ! echo "$zip_test_output" | grep -q "No errors detected"; then
         log_error "Backup integrity check failed - decrypted file is not a valid zip"
+        log_error "Zip test output: $zip_test_output"
+        log_error "File type detected: $file_type"
+        
+        # Show first few bytes of the file for debugging
+        log_info "First 32 bytes of decrypted file (hex):"
+        hexdump -C "$temp_verify" | head -2 | tee -a "$LOG_FILE"
+        
         rm -f "$temp_verify"
         exit 1
     fi
