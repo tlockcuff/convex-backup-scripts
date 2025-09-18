@@ -43,10 +43,6 @@ cleanup_on_error() {
         log_info "Removing incomplete backup file"
         rm -f "$BACKUPS_DIR/$TIMESTAMP.zip"
     fi
-    if [[ -f "$BACKUPS_DIR/$TIMESTAMP.zip.gz" ]]; then
-        log_info "Removing incomplete compressed backup file"
-        rm -f "$BACKUPS_DIR/$TIMESTAMP.zip.gz"
-    fi
     
     # Remove lock file
     [[ -f "$LOCK_FILE" ]] && rm -f "$LOCK_FILE"
@@ -100,7 +96,7 @@ validate_config() {
     fi
     
     # Check required commands
-    local required_commands=("npx" "openssl" "find" "crontab" "gzip")
+    local required_commands=("npx" "openssl" "find" "crontab")
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
             log_error "Required command '$cmd' is not installed"
@@ -173,8 +169,7 @@ create_backup() {
     chmod 700 "$BACKUPS_DIR"
     
     local backup_file="$BACKUPS_DIR/$TIMESTAMP.zip"
-    local compressed_file="$backup_file.gz"
-    local encrypted_file="$compressed_file.enc"
+    local encrypted_file="$backup_file.enc"
     
     # Export the convex database
     log_info "Exporting Convex database..."
@@ -197,27 +192,10 @@ create_backup() {
     
     log_success "Database exported successfully ($(($backup_size/1024/1024))MB)"
     
-    # Compress the backup file with gzip
-    log_info "Compressing backup file with gzip..."
-    if ! gzip -9 "$backup_file"; then
-        log_error "Failed to compress backup file"
-        exit 1
-    fi
-    
-    # Verify compressed file was created
-    if [[ ! -f "$compressed_file" ]]; then
-        log_error "Compressed backup file was not created: $compressed_file"
-        exit 1
-    fi
-    
-    local compressed_size=$(stat -f%z "$compressed_file" 2>/dev/null || stat -c%s "$compressed_file" 2>/dev/null)
-    local compression_ratio=$(( (backup_size - compressed_size) * 100 / backup_size ))
-    log_success "Backup compressed successfully ($(($compressed_size/1024/1024))MB, ${compression_ratio}% reduction)"
-    
-    # Encrypt the compressed backup file
-    log_info "Encrypting compressed backup file..."
-    if ! openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in "$compressed_file" -out "$encrypted_file" -pass pass:"$BACKUP_PASSWORD"; then
-        log_error "Failed to encrypt compressed backup file"
+    # Encrypt the backup file
+    log_info "Encrypting backup file..."
+    if ! openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in "$backup_file" -out "$encrypted_file" -pass pass:"$BACKUP_PASSWORD"; then
+        log_error "Failed to encrypt backup file"
         exit 1
     fi
     
@@ -230,12 +208,12 @@ create_backup() {
     # Set secure permissions on encrypted file
     chmod 600 "$encrypted_file"
     
-    log_success "Compressed backup file encrypted successfully"
+    log_success "Backup file encrypted successfully"
     
-    # Delete the compressed backup file
-    log_info "Removing unencrypted compressed backup file..."
-    rm "$compressed_file"
-    log_success "Unencrypted compressed backup file removed"
+    # Delete the original backup file
+    log_info "Removing unencrypted backup file..."
+    rm "$backup_file"
+    log_success "Unencrypted backup file removed"
     
     log_success "Backup created and encrypted"
     
@@ -296,7 +274,7 @@ apply_retention_policy() {
         log_info "Removing old local backup: $(basename "$file")"
         rm "$file"
         ((deleted_count++))
-    done < <(find "$BACKUPS_DIR" -name "*.zip.gz.enc" -type f -mtime "+$RETENTION_POLICY" -print0 2>/dev/null || true)
+    done < <(find "$BACKUPS_DIR" -name "*.zip.enc" -type f -mtime "+$RETENTION_POLICY" -print0 2>/dev/null || true)
     
     if [[ $deleted_count -gt 0 ]]; then
         log_success "Removed $deleted_count old local backup(s)"
@@ -349,7 +327,7 @@ cleanup_s3_backups() {
                 fi
             fi
         fi
-    done < <(aws s3 ls "s3://${AWS_BUCKET_NAME}/convex-backups/" --recursive | grep '\.zip\.gz\.enc$' | awk '{print $4}' 2>/dev/null || true)
+    done < <(aws s3 ls "s3://${AWS_BUCKET_NAME}/convex-backups/" --recursive | grep '\.zip\.enc$' | awk '{print $4}' 2>/dev/null || true)
     
     if [[ $deleted_s3_count -gt 0 ]]; then
         log_success "Removed $deleted_s3_count old S3 backup(s)"
@@ -397,7 +375,7 @@ main() {
     
     # Success
     log_success "🎉 Backup completed successfully!"
-    log_info "Encrypted backup saved as: $BACKUPS_DIR/$TIMESTAMP.zip.gz.enc"
+    log_info "Encrypted backup saved as: $BACKUPS_DIR/$TIMESTAMP.zip.enc"
     
     # Clean up
     rm -f "$LOCK_FILE"
