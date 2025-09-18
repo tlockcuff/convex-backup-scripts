@@ -7,7 +7,7 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly TIMESTAMP=$(date +%Y%m%d%H%M%S)
 readonly BACKUP_SCRIPT="$SCRIPT_DIR/backup.sh"
-readonly CRON_EXPRESSION="0 12 * * *" # every day at 12:00 PM
+readonly CRON_EXPRESSION="0 23 * * *" # every day at 11:00 PM
 readonly RETENTION_POLICY=${RETENTION_POLICY:-14} # 14 days default
 readonly BACKUPS_DIR="$SCRIPT_DIR/backups"
 readonly LOG_FILE="$SCRIPT_DIR/backup.log"
