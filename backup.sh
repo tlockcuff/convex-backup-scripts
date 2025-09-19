@@ -152,7 +152,7 @@ validate_config() {
 check_convex_access() {
     log_info "Checking Convex access..."
     
-    if ! npx convex --version &> /dev/null; then
+    if ! npx --yes convex --version &> /dev/null; then
         log_error "Convex CLI is not accessible"
         exit 1
     fi
