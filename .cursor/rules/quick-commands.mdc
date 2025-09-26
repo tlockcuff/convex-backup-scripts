@@ -1,0 +1,240 @@
+---
+alwaysApply: true
+description: Quick reference for common commands and operations
+---
+
+# Quick Commands Reference
+
+## Project Setup
+
+**Install Node.js and dependencies**:
+```bash
+# macOS
+brew install node
+cd /Users/travis/GitRepos/convex-backup
+npm install
+
+# Linux
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+cd /Users/travis/GitRepos/convex-backup
+npm install
+```
+
+**Verify setup**:
+```bash
+node --version    # Should show version
+npm --version     # Should show version
+npx --version     # Should show version
+npx convex --version  # Should show Convex CLI version
+```
+
+## Backup Operations
+
+**Run backup manually**:
+```bash
+./backup.sh
+```
+
+**Check backup status**:
+```bash
+tail -f backup.log
+```
+
+**View recent backup activity**:
+```bash
+tail -n 20 backup.log
+```
+
+**Search for errors in logs**:
+```bash
+grep -i "error" backup.log
+grep -i "failed" backup.log
+```
+
+## Testing Components
+
+**Test Convex access**:
+```bash
+npx convex auth
+npx convex --version
+npx convex export --include-file-storage --path test.zip
+```
+
+**Test encryption/decryption**:
+```bash
+# Encrypt
+echo "test_password" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in test.zip -out test.zip.enc -pass stdin
+
+# Decrypt
+echo "test_password" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -in test.zip.enc -out test_decrypted.zip -pass stdin
+```
+
+## File Management
+
+**List backup files**:
+```bash
+ls -la backups/
+```
+
+**Check backup file sizes**:
+```bash
+ls -lh backups/*.enc
+```
+
+**Remove old backups manually**:
+```bash
+# Remove backups older than 7 days
+find backups/ -name "*.enc" -mtime +7 -delete
+
+# Remove all backups (CAUTION!)
+rm -f backups/*.enc
+```
+
+## Cron Management
+
+**Check current cron jobs**:
+```bash
+crontab -l
+```
+
+**Edit cron jobs**:
+```bash
+crontab -e
+```
+
+**Remove backup cron job**:
+```bash
+crontab -l | grep -v backup.sh | crontab -
+```
+
+## Lock File Management
+
+**Check if backup is running**:
+```bash
+cat backup.lock 2>/dev/null || echo "No backup running"
+```
+
+**Force unlock (if stuck)**:
+```bash
+rm -f backup.lock
+```
+
+**Kill stuck backup process**:
+```bash
+# Find backup process
+ps aux | grep backup.sh
+
+# Kill it
+kill -9 <PID>
+```
+
+## Log Management
+
+**View logs with timestamps**:
+```bash
+cat backup.log | grep -E "^\[[0-9-]+ [0-9:]+\]"
+```
+
+**Filter logs by level**:
+```bash
+grep "ERROR" backup.log
+grep "SUCCESS" backup.log
+grep "INFO" backup.log
+```
+
+**Clean old logs**:
+```bash
+# Keep only last 1000 lines
+tail -n 1000 backup.log > backup.log.tmp && mv backup.log.tmp backup.log
+```
+
+## Environment and Configuration
+
+**Check environment variables**:
+```bash
+env | grep -E "(AWS|BACKUP)" | sort
+```
+
+**Validate configuration**:
+```bash
+source backup.sh && validate_config
+```
+
+**Test AWS S3 access**:
+```bash
+aws s3 ls s3://your-bucket-name/ 2>/dev/null && echo "S3 access OK" || echo "S3 access failed"
+```
+
+## System Checks
+
+**Check disk space**:
+```bash
+df -h .
+```
+
+**Check available memory**:
+```bash
+free -h
+```
+
+**Check running processes**:
+```bash
+ps aux | grep -E "(backup|convex|node)" | grep -v grep
+```
+
+## Emergency Commands
+
+**Stop all backup processes**:
+```bash
+pkill -f backup.sh
+```
+
+**Clear all locks and temp files**:
+```bash
+rm -f backup.lock
+rm -f backups/*.zip backups/*.enc
+```
+
+**Complete reset**:
+```bash
+# Stop processes
+pkill -f backup.sh
+
+# Clear locks
+rm -f backup.lock
+
+# Clear all backups
+rm -rf backups/*
+
+# Clear logs
+> backup.log
+
+# Reinstall dependencies
+npm install
+```
+
+## Debug Mode
+
+**Run backup with verbose output**:
+```bash
+# Add debug output to backup script temporarily
+sed -i 's/set -euo pipefail/set -euo pipefail -x/' backup.sh
+./backup.sh
+sed -i 's/set -euo pipefail -x/set -euo pipefail/' backup.sh
+```
+
+**Test specific functions**:
+```bash
+# Source the script and run individual functions
+source backup.sh
+
+# Test configuration
+validate_config
+
+# Test Convex access
+check_convex_access
+
+# Test backup creation (creates test backup)
+create_backup
+```

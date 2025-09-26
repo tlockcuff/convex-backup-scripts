@@ -1,0 +1,145 @@
+---
+alwaysApply: true
+description: Configuration requirements and environment variables for the backup system
+---
+
+# Backup Configuration Guide
+
+## Required Environment Variables
+
+The backup script requires a `.env` file in the project root with the following variables:
+
+### Essential Variables
+
+**BACKUP_PASSWORD** (Required)
+- Minimum 12 characters long
+- Used for AES-256-CBC encryption of backup files
+- Must be strong and unique
+- Example: `BACKUP_PASSWORD=MySecureBackupPassword123!`
+
+### Optional AWS S3 Variables
+
+If you want to upload backups to AWS S3, add these variables:
+
+**AWS_BUCKET_NAME** (Optional)
+- Name of your S3 bucket for backup storage
+- Must already exist and be configured for your AWS account
+- Example: `AWS_BUCKET_NAME=my-convex-backups`
+
+**AWS_REGION** (Required if using S3)
+- AWS region where your S3 bucket is located
+- Example: `AWS_REGION=us-east-1`
+
+**AWS_ACCESS_KEY_ID** (Required if using S3)
+- Your AWS access key ID
+- Must have S3 read/write permissions
+- Example: `AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE`
+
+**AWS_SECRET_ACCESS_KEY** (Required if using S3)
+- Your AWS secret access key
+- Must correspond to the access key ID above
+- Example: `AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`
+
+## Configuration File Location
+
+Create a `.env` file in the project root (`/Users/travis/GitRepos/convex-backup/`):
+
+```bash
+# Essential configuration
+BACKUP_PASSWORD=YourSecurePasswordHere123!
+
+# Optional S3 configuration (uncomment if needed)
+# AWS_BUCKET_NAME=your-backup-bucket
+# AWS_REGION=us-east-1
+# AWS_ACCESS_KEY_ID=your-access-key
+# AWS_SECRET_ACCESS_KEY=your-secret-key
+```
+
+## Security Best Practices
+
+### Password Requirements
+- **Minimum length**: 12 characters
+- **Include**: Uppercase, lowercase, numbers, and special characters
+- **Avoid**: Dictionary words, personal information
+- **Change regularly**: Rotate backup passwords periodically
+
+### File Permissions
+- The script automatically sets proper permissions on encrypted files (`chmod 600`)
+- The `backups/` directory is created with `chmod 700` (owner access only)
+- Ensure your `.env` file has restricted permissions: `chmod 600 .env`
+
+### AWS Security
+- Use IAM roles with minimal required permissions
+- Consider using temporary credentials via AWS STS
+- Enable S3 bucket versioning for backup recovery
+- Set up S3 lifecycle policies for cost optimization
+
+## Alternative Configuration Methods
+
+### Environment Variables (instead of .env file)
+You can also set variables directly in your shell:
+
+```bash
+export BACKUP_PASSWORD="YourSecurePasswordHere123!"
+export AWS_BUCKET_NAME="your-backup-bucket"
+export AWS_REGION="us-east-1"
+# ... other variables
+
+# Run backup
+./backup.sh
+```
+
+### Configuration File Validation
+
+The script validates configuration on startup:
+1. Checks for `.env` file existence
+2. Verifies `BACKUP_PASSWORD` is set and meets requirements
+3. Validates AWS configuration if S3 upload is enabled
+4. Ensures required commands are available
+5. Checks disk space availability
+
+### Customizing Backup Behavior
+
+You can override default settings by setting these variables:
+
+**RETENTION_POLICY** (Default: 14)
+- Number of days to keep backups
+- Example: `RETENTION_POLICY=30` (keep for 30 days)
+
+**CRON_EXPRESSION** (Default: "0 23 * * *")
+- Cron schedule for automated backups
+- Example: `CRON_EXPRESSION="0 2 * * *"` (daily at 2 AM)
+
+## Testing Your Configuration
+
+After setting up your `.env` file, test the configuration:
+
+```bash
+# Test configuration validation
+cd /Users/travis/GitRepos/convex-backup
+
+# Source the script to run validation function
+source backup.sh && validate_config
+
+# If validation passes, test a small backup
+npx convex export --include-file-storage --path test-backup.zip
+```
+
+## Backup Storage Options
+
+### Local Storage Only
+- Backups stored in `backups/` directory
+- Requires sufficient local disk space
+- Good for small projects or development
+
+### S3 Storage Only
+- Backups uploaded to S3, local files deleted after upload
+- Requires AWS configuration
+- Good for production environments
+- Cost-effective with S3 lifecycle policies
+
+### Hybrid (Local + S3)
+- Backups stored locally AND uploaded to S3
+- Maximum redundancy
+- Requires more disk space and S3 storage costs
+- Best for critical data

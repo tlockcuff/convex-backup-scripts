@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Convex Backup Script with Auto-Installation
+#
+# This script automatically installs Node.js via Volta if it's not available,
+# making it work seamlessly in cron jobs where Node.js might not be installed.
+#
+# Features:
+# - Automatic Volta installation if npx is not found
+# - Node.js installation using Volta version manager
+# - Works both manually and via cron
+# - All original backup functionality preserved
+
 # Enable strict error handling
 set -euo pipefail
 
@@ -71,6 +82,64 @@ check_lock() {
     log_info "Created lock file with PID $$"
 }
 
+# Ensure Node.js is available via Volta
+ensure_nodejs() {
+    log_info "Checking Node.js availability..."
+
+    # Check if npx is available
+    if command -v npx &> /dev/null; then
+        log_success "Node.js is already available"
+        return 0
+    fi
+
+    log_warn "Node.js not found. Installing via Volta..."
+
+    # Install Volta if not present
+    if [[ ! -d "$HOME/.volta" ]]; then
+        log_info "Installing Volta (Node.js version manager)..."
+        curl https://get.volta.sh | bash -s -- --skip-setup
+
+        # Source Volta in current session
+        export VOLTA_HOME="$HOME/.volta"
+        export PATH="$VOLTA_HOME/bin:$PATH"
+
+        # Add Volta to shell profile for future sessions
+        local shell_profile
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            shell_profile="$HOME/.zshrc"
+        else
+            shell_profile="$HOME/.bashrc"
+        fi
+
+        if [[ -f "$shell_profile" ]]; then
+            if ! grep -q 'VOLTA_HOME' "$shell_profile"; then
+                echo 'export VOLTA_HOME="$HOME/.volta"' >> "$shell_profile"
+                echo 'export PATH="$VOLTA_HOME/bin:$PATH"' >> "$shell_profile"
+                log_info "Added Volta to $shell_profile"
+            fi
+        fi
+
+        log_success "Volta installed successfully"
+    else
+        log_info "Volta already installed, setting up environment..."
+        export VOLTA_HOME="$HOME/.volta"
+        export PATH="$VOLTA_HOME/bin:$PATH"
+    fi
+
+    # Install Node.js using Volta
+    log_info "Installing Node.js..."
+    volta install node
+
+    # Verify installation
+    if command -v npx &> /dev/null; then
+        log_success "Node.js installed successfully via Volta"
+        return 0
+    else
+        log_error "Failed to install Node.js via Volta"
+        return 1
+    fi
+}
+
 # Validate environment and configuration
 validate_config() {
     log_info "Validating configuration..."
@@ -96,7 +165,7 @@ validate_config() {
     fi
     
     # Check required commands
-    local required_commands=("npx" "openssl" "find" "crontab")
+    local required_commands=("openssl" "find" "crontab")
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
             log_error "Required command '$cmd' is not installed"
@@ -365,6 +434,7 @@ main() {
     
     # Initialize
     check_lock
+    ensure_nodejs
     validate_config
     check_convex_access
     

@@ -1,0 +1,148 @@
+---
+alwaysApply: true
+description: Critical context about server vs local execution - prevents running server commands locally
+---
+
+# 🚨 SERVER EXECUTION CONTEXT - READ CAREFULLY
+
+## ⚠️ IMPORTANT DISTINCTION
+
+**This backup script runs on a SERVER, not on your local machine!**
+
+The Convex backup script is designed to run on a **remote server** where:
+- ✅ Node.js and npm are installed
+- ✅ Convex CLI is configured and authenticated
+- ✅ Cron jobs execute the backup process
+- ✅ AWS S3 credentials are available (if using S3)
+- ✅ Database backups are created and stored
+
+## 🚫 DO NOT RUN THESE COMMANDS LOCALLY
+
+**Never run the following commands on your local machine:**
+- ❌ `./backup.sh` (main backup script)
+- ❌ `npx convex export` (database export)
+- ❌ `npx convex auth` (Convex authentication)
+- ❌ `npm install` (project dependencies)
+- ❌ `crontab -e` (cron job management)
+- ❌ AWS CLI commands (S3 operations)
+
+## ✅ SAFE LOCAL OPERATIONS
+
+**These operations are safe to perform locally:**
+- ✅ Edit configuration files (`.env`, `backup.sh`)
+- ✅ Modify Cursor Rules
+- ✅ Test script syntax and logic
+- ✅ Review logs and documentation
+- ✅ Plan server deployment steps
+- ✅ Create documentation and guides
+
+## 🔄 SERVER DEPLOYMENT WORKFLOW
+
+### Step 1: Local Development
+```bash
+# Safe local operations only
+cd /Users/travis/GitRepos/convex-backup
+
+# Edit configuration
+nano .env
+nano backup.sh
+
+# Test script syntax (without execution)
+bash -n backup.sh
+
+# Review and document changes
+```
+
+### Step 2: Deploy to Server
+```bash
+# Upload files to server
+scp -r /Users/travis/GitRepos/convex-backup user@server:/path/to/backup/
+
+# SSH to server and run setup
+ssh user@server
+cd /path/to/backup
+
+# Install dependencies on SERVER
+npm install
+
+# Configure environment on SERVER
+# ... setup .env file on server ...
+
+# Test backup script on SERVER
+./backup.sh
+```
+
+### Step 3: Server Maintenance
+```bash
+# All maintenance happens on the SERVER via SSH
+ssh user@server
+
+# Check backup status
+tail -f /path/to/backup/backup.log
+
+# Manual backup run
+cd /path/to/backup && ./backup.sh
+
+# Cron management
+crontab -e
+
+# Disk space monitoring
+df -h
+```
+
+## 🏃‍♂️ QUICK SERVER ACCESS PATTERNS
+
+**Check server backup status:**
+```bash
+ssh user@server "tail -n 20 /path/to/backup/backup.log"
+```
+
+**Run manual backup on server:**
+```bash
+ssh user@server "cd /path/to/backup && ./backup.sh"
+```
+
+**Check server disk space:**
+```bash
+ssh user@server "df -h /path/to/backup"
+```
+
+## 🚨 RED FLAGS TO AVOID
+
+**If you see suggestions to run these, STOP:**
+- Any command starting with `./backup.sh`
+- `npx convex` commands
+- `npm install` in this context
+- `crontab` modifications
+- AWS CLI commands
+- SSH or remote execution commands
+
+**Instead ask:**
+- "How do I deploy this to my server?"
+- "What should I run on the server?"
+- "How do I configure this for server execution?"
+
+## 📋 DEPLOYMENT CHECKLIST
+
+Before considering the backup system "working":
+
+1. ✅ **Local Development**: Script syntax, configuration, documentation
+2. ✅ **Server Upload**: Files transferred to server successfully
+3. ✅ **Server Dependencies**: Node.js, npm, Convex CLI installed on server
+4. ✅ **Server Configuration**: .env file set up on server with proper credentials
+5. ✅ **Server Authentication**: Convex CLI authenticated on server
+6. ✅ **Server Test**: Manual backup test successful on server
+7. ✅ **Server Automation**: Cron job configured and tested on server
+8. ✅ **Server Monitoring**: Log monitoring and alerting set up
+
+## 🎯 CONTEXT-AWARE DECISIONS
+
+When working with this codebase:
+
+- **Local machine**: Code editing, documentation, planning
+- **Server**: All actual backup operations, testing, monitoring
+- **CI/CD**: Automated deployment and testing pipelines
+- **Development**: Local testing of script logic and syntax
+- **Production**: Server-based backup execution
+
+Remember: This is a **server-side backup system** - treat it as such! 🎯

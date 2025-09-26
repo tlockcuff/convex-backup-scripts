@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+description: Overview of the Convex backup script structure and main functionality
+---
+
+# Convex Backup Script Overview
+
+The main entry point for this backup system is **[backup.sh](mdc:backup.sh)**, a comprehensive Bash script that handles automated Convex database backups with the following key features:
+
+## Core Functionality
+
+- **Automated Scheduling**: Uses cron to run daily backups at 11:00 PM (configurable via `CRON_EXPRESSION`)
+- **Database Export**: Uses `npx convex export` to create full database backups including file storage
+- **Encryption**: Encrypts backups using AES-256-CBC with PBKDF2 key derivation
+- **Local Storage**: Stores encrypted backups in the `backups/` directory
+- **AWS S3 Upload**: Optional S3 integration for cloud backup storage
+- **Retention Policy**: Automatically cleans up old backups (default: 14 days)
+- **Lock File Protection**: Prevents concurrent backup runs
+
+## Key Components
+
+1. **Configuration Validation**: Checks for required commands, environment variables, and disk space
+2. **Convex Access Verification**: Ensures Convex CLI is accessible before attempting backup
+3. **Backup Creation**: Exports database → encrypts file → optionally uploads to S3
+4. **Cleanup**: Removes old backups locally and in S3 based on retention policy
+
+## Environment Requirements
+
+- **Node.js & npm**: Required for `npx` command to run Convex CLI
+- **OpenSSL**: For backup encryption
+- **AWS CLI**: Optional, for S3 upload functionality
+- **.env file**: Must contain `BACKUP_PASSWORD` (minimum 12 characters)
+
+## Common Issues
+
+- **"npx not installed"**: Install Node.js to get access to npx
+- **"Convex CLI not accessible"**: Ensure Convex is properly authenticated
+- **"Insufficient disk space"**: Need at least 1GB free space for backups
+- **"AWS configuration errors"**: Verify AWS credentials and permissions when using S3

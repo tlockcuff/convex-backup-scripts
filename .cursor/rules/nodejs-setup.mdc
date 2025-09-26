@@ -1,0 +1,92 @@
+---
+alwaysApply: true
+description: Node.js and npm installation requirements for Convex backup functionality
+---
+
+# Node.js Setup for Convex Backups
+
+The backup script requires Node.js and npm to run the Convex CLI via `npx`. Here's how to set it up:
+
+## Quick Installation (Recommended)
+
+### macOS (using Homebrew):
+```bash
+# Install Node.js (includes npm and npx)
+brew install node
+
+# Verify installation
+node --version
+npm --version
+npx --version
+```
+
+### Ubuntu/Debian Linux:
+```bash
+# Install Node.js and npm
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Verify installation
+node --version
+npm --version
+npx --version
+```
+
+### Alternative: Using Node Version Manager (nvm)
+
+```bash
+# Install nvm (Linux/macOS)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Restart terminal or run:
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Install and use Node.js
+nvm install 18
+nvm use 18
+
+# Verify installation
+node --version
+npm --version
+npx --version
+```
+
+## Project-Specific Setup
+
+After installing Node.js:
+
+1. **Navigate to project directory**:
+   ```bash
+   cd /Users/travis/GitRepos/convex-backup
+   ```
+
+2. **Install project dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Verify Convex CLI access**:
+   ```bash
+   npx convex --version
+   ```
+
+## Troubleshooting
+
+### If you get "command not found" errors:
+- **macOS**: Try restarting your terminal or run `source ~/.bash_profile`
+- **Linux**: Try restarting your terminal or run `source ~/.bashrc`
+- **Check PATH**: Run `echo $PATH` to ensure Node.js bin directory is included
+
+### If npm install fails:
+- Ensure you have internet connectivity
+- Try `npm install --verbose` for detailed error messages
+- Consider clearing npm cache: `npm cache clean --force`
+
+### Project-specific Node.js version:
+The project specifies Node.js 24.8.0 in **[package.json](mdc:package.json)**. If you encounter compatibility issues, install this specific version:
+```bash
+# Using nvm
+nvm install 24.8.0
+nvm use 24.8.0
+```

@@ -1,0 +1,141 @@
+---
+alwaysApply: true
+description: Common backup script issues and their solutions
+---
+
+# Backup Script Troubleshooting Guide
+
+## Current Issue: "Required command 'npx' is not installed"
+
+**Error**: `Required command 'npx' is not installed`
+
+**Solution**: Install Node.js which includes npm and npx:
+```bash
+# macOS
+brew install node
+
+# Ubuntu/Debian
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Then install project dependencies
+cd /Users/travis/GitRepos/convex-backup
+npm install
+```
+
+## Other Common Issues
+
+### 1. "Convex CLI is not accessible"
+**Error**: `Convex CLI is not accessible`
+
+**Solutions**:
+- Ensure you're logged in to Convex: `npx convex auth`
+- Verify your Convex project is properly configured
+- Check if you have the correct permissions for the project
+
+### 2. "BACKUP_PASSWORD is not set in .env file"
+**Error**: `BACKUP_PASSWORD is not set in .env file`
+
+**Solution**: Create or update the `.env` file:
+```bash
+# Create .env file in project root
+echo "BACKUP_PASSWORD=your_secure_password_here" > .env
+
+# Ensure password is at least 12 characters long
+# Use a strong, unique password for backup encryption
+```
+
+### 3. "Insufficient disk space"
+**Error**: `Insufficient disk space. Available: XM B, Required: 1GB`
+
+**Solutions**:
+- Free up disk space in the project directory
+- Move old backups to external storage
+- Adjust retention policy in backup script (reduce `RETENTION_POLICY`)
+- Enable S3 uploads to avoid storing backups locally
+
+### 4. "AWS configuration errors" (when using S3)
+**Errors**:
+- `AWS_REGION is required when AWS_BUCKET_NAME is set`
+- `AWS_ACCESS_KEY_ID is required when AWS_BUCKET_NAME is set`
+- `AWS_SECRET_ACCESS_KEY is required when AWS_BUCKET_NAME is set`
+
+**Solution**: Add AWS configuration to `.env` file:
+```bash
+# Add these to your .env file
+AWS_BUCKET_NAME=your-backup-bucket-name
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_key_here
+```
+
+### 5. "Failed to export Convex database"
+**Error**: `Failed to export Convex database`
+
+**Solutions**:
+- Verify Convex authentication: `npx convex auth`
+- Check your internet connection
+- Ensure your Convex project exists and is accessible
+- Try running the export manually: `npx convex export --include-file-storage --path test.zip`
+
+### 6. "Backup script is already running"
+**Error**: `Backup script is already running (PID: XXXX)`
+
+**Solutions**:
+- Wait for the current backup to complete
+- Check if there's a stuck process: `kill -9 <PID>`
+- Remove stale lock file: `rm -f backup.lock`
+- Check backup logs: `tail -f backup.log`
+
+## Log Analysis
+
+**View recent logs**:
+```bash
+tail -n 50 backup.log
+```
+
+**Monitor live logs**:
+```bash
+tail -f backup.log
+```
+
+**Search for specific errors**:
+```bash
+grep -i "error" backup.log
+```
+
+## Manual Testing
+
+**Test individual components**:
+
+1. **Check configuration**:
+   ```bash
+   # Run validation manually
+   source backup.sh && validate_config
+   ```
+
+2. **Test Convex access**:
+   ```bash
+   npx convex --version
+   npx convex export --include-file-storage --path test.zip
+   ```
+
+3. **Test encryption**:
+   ```bash
+   echo "test_password" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in test.zip -out test.zip.enc -pass stdin
+   ```
+
+## Recovery Procedures
+
+**If backups are corrupted**:
+1. Stop the cron job temporarily
+2. Remove corrupted backup files from `backups/` directory
+3. Test manual backup creation
+4. Restore from S3 if available
+5. Restart cron job
+
+**If script gets stuck**:
+1. Kill any running backup processes
+2. Remove lock file: `rm -f backup.lock`
+3. Check system resources (disk space, memory)
+4. Restart the backup process
