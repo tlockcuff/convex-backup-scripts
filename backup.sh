@@ -416,9 +416,12 @@ setup_cron() {
         # Remove any existing entries for this script to avoid duplicates
         local temp_cron=$(mktemp)
         crontab -l 2>/dev/null | grep -v -F "$BACKUP_SCRIPT" > "$temp_cron" || true
+
+        HOME="${HOME:-$(eval echo ~$(whoami))}"
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         
         # Add the new cron job
-        echo "$CRON_EXPRESSION $BACKUP_SCRIPT >> $LOG_FILE 2>&1" >> "$temp_cron"
+        echo "$CRON_EXPRESSION /bin/bash -l -c 'cd $SCRIPT_DIR && export PATH="$HOME/.volta/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" && ./backup.sh' >> $SCRIPT_DIR/backup.log 2>&1"
         
         # Install the new crontab
         crontab "$temp_cron"
