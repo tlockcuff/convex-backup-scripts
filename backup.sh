@@ -410,25 +410,52 @@ setup_cron() {
     log_info "Checking cron job setup..."
     
     # Check if any cron job exists for this backup script (regardless of log redirection)
-    if crontab -l 2>/dev/null | grep -F "$BACKUP_SCRIPT" | grep -q "$CRON_EXPRESSION"; then
+    if crontab -l 2>/dev/null | grep -q "$CRON_EXPRESSION"; then
         log_info "Cron job already exists"
-    else
-        # Remove any existing entries for this script to avoid duplicates
-        local temp_cron=$(mktemp)
-        crontab -l 2>/dev/null | grep -v -F "$BACKUP_SCRIPT" > "$temp_cron" || true
-
-        HOME="${HOME:-$(eval echo ~$(whoami))}"
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        
-        # Add the new cron job
-        echo "$CRON_EXPRESSION /bin/bash -l -c 'cd $SCRIPT_DIR && export PATH="$HOME/.volta/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" && ./backup.sh' >> $SCRIPT_DIR/backup.log 2>&1"
-        
-        # Install the new crontab
-        crontab "$temp_cron"
-        rm -f "$temp_cron"
-        
-        log_success "Cron job added: $CRON_EXPRESSION"
+        return 0
     fi
+    
+    # Remove any existing entries for this script to avoid duplicates
+    local temp_cron=$(mktemp)
+    crontab -l 2>/dev/null | grep -v -F "$BACKUP_SCRIPT" > "$temp_cron" 2>/dev/null || true
+    
+    # Determine home directory
+    local home_dir="${HOME:-$(eval echo ~$(whoami))}"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Define Volta path (adjust if Volta is installed elsewhere)
+    local volta_path="$home_dir/.volta/bin"
+    
+    # Check if Volta is actually installed
+    if [[ ! -d "$volta_path" ]]; then
+        log_warn "Volta not found at $volta_path - using system PATH"
+        volta_path=""
+    fi
+    
+    # Build PATH with Volta if available
+    local cron_path
+    if [[ -n "$volta_path" ]]; then
+        cron_path="$volta_path:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    else
+        cron_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    fi
+    
+    # Create cron job entry with proper quoting
+    local cron_entry="$CRON_EXPRESSION cd \"$script_dir\" && export PATH=\"$cron_path\" && ./backup.sh >> \"$script_dir/backup.log\" 2>&1"
+    
+    # Add the new cron job to temp file
+    echo "$cron_entry" >> "$temp_cron"
+    
+    # Install the new crontab
+    if crontab "$temp_cron"; then
+        log_success "Cron job added: $CRON_EXPRESSION"
+    else
+        log_error "Failed to install cron job"
+        rm -f "$temp_cron"
+        return 1
+    fi
+    
+    rm -f "$temp_cron"
 }
 
 # Main execution
