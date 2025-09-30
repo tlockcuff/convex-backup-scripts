@@ -1,0 +1,8 @@
+# Make scripts executable after git checkout
+echo "🔧 Ensuring scripts are executable..."
+
+chmod +x backup.sh
+chmod +x setup.sh
+chmod +x status.sh
+
+echo "✓ All scripts are now executable"
